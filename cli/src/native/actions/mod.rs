@@ -35,12 +35,22 @@ use super::storage;
 use super::stream::{self, StreamServer};
 use super::tracing::{self as native_tracing, TracingState};
 use super::webdriver::appium::AppiumManager;
-use super::webdriver::backend::{BrowserBackend, WebDriverBackend, WEBDRIVER_UNSUPPORTED_ACTIONS};
+use super::webdriver::backend::{BrowserBackend, WEBDRIVER_UNSUPPORTED_ACTIONS};
 use super::webdriver::safari;
 
 mod input;
 mod launch;
 mod net;
+
+// Re-exports for tests in parity_tests.rs and actions mod tests.
+use super::webdriver::backend::WebDriverBackend;
+pub(crate) use input::build_mouse_event_params;
+pub(crate) use launch::{hide_scrollbars_from_launch_cmd, launch_options_from_env};
+pub(crate) use net::{
+    browser_metadata_from_version, build_fetch_patterns, get_har_dir, har_compute_timings,
+    har_entry_to_json, har_parse_request_cookies, har_wall_time_to_rfc3339, matches_status_filter,
+    parse_route_response, unix_timestamp_millis,
+};
 
 use net::{
     handle_auth_login, handle_auth_save, handle_confirm, handle_deny, handle_har_start,
@@ -49,14 +59,6 @@ use net::{
     har_extract_headers, resolve_fetch_paused, route_url_matches,
 };
 // Re-export submodule items needed by tests and external callers.
-pub(crate) use input::build_mouse_event_params;
-pub(crate) use launch::{hide_scrollbars_from_launch_cmd, launch_options_from_env};
-pub(crate) use net::matches_status_filter;
-pub(crate) use net::{
-    browser_metadata_from_version, build_fetch_enable_params, build_fetch_patterns, get_har_dir,
-    har_compute_timings, har_entry_to_json, har_parse_request_cookies, har_wall_time_to_rfc3339,
-    parse_route_response, unix_timestamp_millis,
-};
 
 use input::{
     handle_device_list, handle_input_keyboard, handle_input_mouse, handle_input_touch,

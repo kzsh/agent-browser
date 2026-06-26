@@ -2701,7 +2701,7 @@ agent-browser upgrade - Upgrade to the latest version
 
 Usage: agent-browser upgrade
 
-Detects the current installation method (npm, Homebrew, or Cargo) and runs
+Detects the current installation method (Homebrew or Cargo) and runs
 the appropriate update command. Displays the version change on success, or
 informs you if you are already on the latest version.
 
@@ -3554,9 +3554,9 @@ Environment:
   AI_GATEWAY_MODEL               Default AI model (default: anthropic/claude-sonnet-4.6, or --model flag)
 
 Install:
-  npm install -g agent-browser           # npm
   brew install agent-browser             # Homebrew
   cargo install agent-browser            # Cargo
+  # or download a binary from the GitHub releases page
   agent-browser install                  # Download Chrome (first time)
 
 Examples:

@@ -1,4 +1,3 @@
-use rust_embed::Embed;
 use serde_json::{json, Value};
 use std::sync::Arc;
 
@@ -6,16 +5,10 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::RwLock;
 
 use crate::connection::get_socket_dir;
-#[cfg(windows)]
-use crate::connection::resolve_port;
 
 use super::chat::{chat_status_json, handle_chat_request, handle_models_request};
 use super::dashboard::spawn_session;
 use super::discovery::discover_sessions;
-
-#[derive(Embed)]
-#[folder = "../packages/dashboard/out/"]
-struct DashboardAssets;
 
 pub(super) const CORS_HEADERS: &str = "Access-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type\r\n";
 
@@ -416,14 +409,6 @@ pub(super) async fn relay_command_to_daemon(
             .map_err(|e| format!("Failed to connect to daemon: {}", e))?
     };
 
-    #[cfg(windows)]
-    let stream = {
-        let port = resolve_port(session_name);
-        tokio::net::TcpStream::connect(format!("127.0.0.1:{}", port))
-            .await
-            .map_err(|e| format!("Failed to connect to daemon: {}", e))?
-    };
-
     let (reader, mut writer) = tokio::io::split(stream);
 
     writer
@@ -440,40 +425,12 @@ pub(super) async fn relay_command_to_daemon(
     Ok(response_line.trim().to_string())
 }
 
-pub(super) fn serve_embedded_file(url_path: &str) -> (&'static str, &'static str, Vec<u8>) {
-    let clean = url_path.trim_start_matches('/');
-    let key = if clean.is_empty() {
-        "index.html"
-    } else {
-        clean
-    };
-
-    let file = DashboardAssets::get(key).or_else(|| DashboardAssets::get("index.html"));
-
-    match file {
-        Some(content) => {
-            let ext = key.rsplit('.').next().unwrap_or("");
-            let ct = match ext {
-                "html" => "text/html; charset=utf-8",
-                "js" => "application/javascript; charset=utf-8",
-                "css" => "text/css; charset=utf-8",
-                "json" => "application/json; charset=utf-8",
-                "svg" => "image/svg+xml",
-                "png" => "image/png",
-                "ico" => "image/x-icon",
-                "woff2" => "font/woff2",
-                "woff" => "font/woff",
-                "txt" => "text/plain; charset=utf-8",
-                _ => "application/octet-stream",
-            };
-            ("200 OK", ct, content.data.to_vec())
-        }
-        None => (
-            "404 Not Found",
-            "text/html; charset=utf-8",
-            b"<html><body><p>404 Not Found</p></body></html>".to_vec(),
-        ),
-    }
+pub(super) fn serve_embedded_file(_url_path: &str) -> (&'static str, &'static str, Vec<u8>) {
+    (
+        "404 Not Found",
+        "text/html; charset=utf-8",
+        b"<html><body><p>Dashboard not available.</p></body></html>".to_vec(),
+    )
 }
 
 #[cfg(test)]

@@ -114,23 +114,6 @@ pub fn find_lightpanda() -> Option<PathBuf> {
         }
     }
 
-    #[cfg(windows)]
-    {
-        if let Ok(output) = Command::new("where").arg("lightpanda").output() {
-            if output.status.success() {
-                let path = String::from_utf8_lossy(&output.stdout)
-                    .lines()
-                    .next()
-                    .unwrap_or("")
-                    .trim()
-                    .to_string();
-                if !path.is_empty() {
-                    return Some(PathBuf::from(path));
-                }
-            }
-        }
-    }
-
     if let Some(home) = dirs::home_dir() {
         let candidates = [
             home.join(".lightpanda/lightpanda"),

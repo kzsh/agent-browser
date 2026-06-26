@@ -132,20 +132,7 @@ fn chrome_binary_in_dir(dir: &Path) -> Option<PathBuf> {
         None
     }
 
-    #[cfg(target_os = "windows")]
-    {
-        let bin = dir.join("chrome.exe");
-        if bin.exists() {
-            return Some(bin);
-        }
-        let inner = dir.join("chrome-win64/chrome.exe");
-        if inner.exists() {
-            return Some(inner);
-        }
-        None
-    }
-
-    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
     {
         None
     }
@@ -164,15 +151,10 @@ fn platform_key() -> &'static str {
     {
         "linux64"
     }
-    #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
-    {
-        "win64"
-    }
     #[cfg(not(any(
         all(target_os = "macos", target_arch = "aarch64"),
         all(target_os = "macos", target_arch = "x86_64"),
         all(target_os = "linux", target_arch = "x86_64"),
-        all(target_os = "windows", target_arch = "x86_64"),
     )))]
     {
         // Compiles on unsupported platforms (e.g. linux aarch64) so the binary
@@ -794,16 +776,6 @@ fn which_exists(cmd: &str) -> bool {
             .map(|s| s.success())
             .unwrap_or(false)
     }
-    #[cfg(windows)]
-    {
-        Command::new("where")
-            .arg(cmd)
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-            .map(|s| s.success())
-            .unwrap_or(false)
-    }
 }
 
 fn package_exists_apt(pkg: &str) -> bool {
@@ -828,12 +800,6 @@ mod tests {
         {
             use std::os::unix::process::ExitStatusExt;
             ExitStatus::from_raw(1 << 8)
-        }
-
-        #[cfg(windows)]
-        {
-            use std::os::windows::process::ExitStatusExt;
-            ExitStatus::from_raw(1)
         }
     }
 

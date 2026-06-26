@@ -74,11 +74,6 @@ pub async fn run_daemon(session: &str) {
         let _ = fs::remove_file(&socket_path);
     }
 
-    #[cfg(windows)]
-    {
-        let _ = fs::remove_file(socket_dir.join(format!("{}.port", session)));
-    }
-
     let stream_path = socket_dir.join(format!("{}.stream", session));
     let _ = fs::remove_file(&stream_path);
     let _ = fs::remove_file(socket_dir.join(format!("{}.engine", session)));
@@ -132,10 +127,6 @@ pub async fn run_daemon(session: &str) {
     {
         let _ = fs::remove_file(&socket_path);
     }
-    #[cfg(windows)]
-    {
-        let _ = fs::remove_file(socket_dir.join(format!("{}.port", session)));
-    }
     let _ = fs::remove_file(&pid_path);
     let _ = fs::remove_file(&version_path);
     let _ = fs::remove_file(&stream_path);
@@ -149,7 +140,6 @@ pub async fn run_daemon(session: &str) {
     }
 }
 
-#[cfg(unix)]
 async fn run_socket_server(
     socket_path: &PathBuf,
     session: &str,
@@ -242,102 +232,6 @@ async fn run_socket_server(
             _ = shutdown_signal() => {
                 let mut s = state.lock().await;
                 let _ = close_current_browser(&mut s).await;
-                break;
-            }
-        }
-    }
-
-    Ok(())
-}
-
-#[cfg(windows)]
-async fn run_socket_server(
-    socket_path: &PathBuf,
-    session: &str,
-    stream_client: Option<Arc<RwLock<Option<Arc<CdpClient>>>>>,
-    stream_server: Option<Arc<StreamServer>>,
-    idle_timeout_ms: Option<u64>,
-) -> Result<(), String> {
-    use tokio::net::TcpListener;
-
-    let preferred_port = get_port_for_session(session);
-    // Try the hash-derived port first; if it is blocked (e.g. Windows Hyper-V
-    // excluded port range), fall back to an OS-assigned ephemeral port.
-    let listener = match TcpListener::bind(format!("127.0.0.1:{}", preferred_port)).await {
-        Ok(l) => l,
-        Err(_) => TcpListener::bind("127.0.0.1:0")
-            .await
-            .map_err(|e| format!("Failed to bind TCP: {}", e))?,
-    };
-    let actual_port = listener
-        .local_addr()
-        .map_err(|e| format!("Failed to get local address: {}", e))?
-        .port();
-
-    let socket_dir = socket_path.parent().unwrap_or(std::path::Path::new("."));
-    let port_path = socket_dir.join(format!("{}.port", session));
-    let _ = fs::write(&port_path, actual_port.to_string());
-
-    let stream_file: Option<PathBuf> = if stream_server.is_some() {
-        Some(socket_dir.join(format!("{}.stream", session)))
-    } else {
-        None
-    };
-
-    let state: std::sync::Arc<tokio::sync::Mutex<DaemonState>> = std::sync::Arc::new(
-        tokio::sync::Mutex::new(DaemonState::new_with_stream(stream_client, stream_server)),
-    );
-
-    let (reset_tx, mut reset_rx) = mpsc::channel::<()>(64);
-    let reset_tx = idle_timeout_ms.map(|_| Arc::new(reset_tx));
-
-    let close_notify = Arc::new(Notify::new());
-
-    let idle_sleep = idle_timeout_ms.map(|ms| tokio::time::sleep(Duration::from_millis(ms)));
-    let mut idle_sleep_pin = idle_sleep.map(Box::pin);
-
-    loop {
-        tokio::select! {
-            accept_result = listener.accept() => {
-                match accept_result {
-                    Ok((stream, _)) => {
-                        let state = state.clone();
-                        let reset_tx = reset_tx.clone();
-                        let sf = stream_file.clone();
-                        let cn = close_notify.clone();
-                        tokio::spawn(async move {
-                            handle_connection(stream, state, reset_tx, sf, cn).await;
-                        });
-                    }
-                    Err(e) => {
-                        let _ = writeln!(std::io::stderr(), "Accept error: {}", e);
-                    }
-                }
-            }
-            _ = async {
-                match idle_sleep_pin {
-                    Some(ref mut s) => s.as_mut().await,
-                    None => std::future::pending::<()>().await,
-                }
-            }, if idle_timeout_ms.is_some() => {
-                let mut s = state.lock().await;
-                let _ = close_current_browser(&mut s).await;
-                let _ = fs::remove_file(&port_path);
-                break;
-            }
-            _ = reset_rx.recv(), if idle_timeout_ms.is_some() => {
-                idle_sleep_pin = idle_timeout_ms
-                    .map(|ms| Box::pin(tokio::time::sleep(Duration::from_millis(ms))));
-                continue;
-            }
-            _ = close_notify.notified() => {
-                let _ = fs::remove_file(&port_path);
-                break;
-            }
-            _ = shutdown_signal() => {
-                let mut s = state.lock().await;
-                let _ = close_current_browser(&mut s).await;
-                let _ = fs::remove_file(&port_path);
                 break;
             }
         }
@@ -463,14 +357,6 @@ async fn shutdown_signal() {
             _ = sighup.recv() => {}
         }
     }
-
-    #[cfg(windows)]
-    {
-        if let Err(e) = signal::ctrl_c().await {
-            let _ = writeln!(std::io::stderr(), "Failed to install Ctrl+C handler: {}", e);
-            process::exit(1);
-        }
-    }
 }
 
 fn get_daemon_socket_dir() -> PathBuf {
@@ -493,28 +379,10 @@ fn get_daemon_socket_dir() -> PathBuf {
     std::env::temp_dir().join("agent-browser")
 }
 
-#[cfg(windows)]
-fn get_port_for_session(session: &str) -> u16 {
-    let mut hash: i32 = 0;
-    for c in session.chars() {
-        hash = ((hash << 5).wrapping_sub(hash)).wrapping_add(c as i32);
-    }
-    49152 + ((hash.unsigned_abs() as u32 % 16383) as u16)
-}
-
 #[cfg(test)]
 mod tests {
     #[allow(unused_imports)]
     use super::*;
-
-    #[cfg(windows)]
-    #[test]
-    fn test_port_matches_client_algorithm() {
-        assert_eq!(get_port_for_session("default"), 50838);
-        assert_eq!(get_port_for_session("my-session"), 63105);
-        assert_eq!(get_port_for_session("work"), 51184);
-        assert_eq!(get_port_for_session(""), 49152);
-    }
 
     /// Guard against re-introducing `waitpid(-1)` in daemon code.
     ///

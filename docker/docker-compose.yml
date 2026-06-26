@@ -1,8 +1,7 @@
 # Docker Compose for building agent-browser
 # Usage: docker compose -f docker/docker-compose.yml run build-linux
-#        docker compose -f docker/docker-compose.yml run build-windows
 #
-# Note: macOS builds should be done natively on macOS for compatibility.
+# macOS builds should be done natively: cargo build --release --target <target>
 
 services:
   # Build for Linux platforms
@@ -39,30 +38,6 @@ services:
       '
 
   # Build for Windows
-  build-windows:
-    platform: linux/amd64
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.build
-    volumes:
-      - ../cli:/build
-      - ../bin:/output
-    command: |
-      -c '
-        set -euo pipefail
-        echo "Building for Windows x64..."
-
-        rm -f /output/agent-browser-win32-x64.exe
-
-        cargo build --release --target x86_64-pc-windows-gnu
-        cp /build/target/x86_64-pc-windows-gnu/release/agent-browser.exe /output/agent-browser-win32-x64.exe
-
-        echo ""
-        echo "✓ Windows build completed!"
-        ls -la /output/agent-browser-win32-*
-      '
-
-  # Build for a single target
   build-single:
     platform: linux/amd64
     build:

@@ -3,7 +3,6 @@ use serde_json::Value;
 use std::env;
 use std::fs;
 use std::io::{BufRead, BufReader, Read, Write};
-use std::net::TcpStream;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::thread;
@@ -11,11 +10,6 @@ use std::time::Duration;
 
 #[cfg(unix)]
 use std::os::unix::net::UnixStream;
-
-#[cfg(windows)]
-use windows_sys::Win32::Foundation::CloseHandle;
-#[cfg(windows)]
-use windows_sys::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION};
 
 #[derive(Serialize)]
 #[allow(dead_code)]
@@ -37,17 +31,13 @@ pub struct Response {
 
 #[allow(dead_code)]
 pub enum Connection {
-    #[cfg(unix)]
     Unix(UnixStream),
-    Tcp(TcpStream),
 }
 
 impl Read for Connection {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         match self {
-            #[cfg(unix)]
             Connection::Unix(s) => s.read(buf),
-            Connection::Tcp(s) => s.read(buf),
         }
     }
 }
@@ -55,17 +45,13 @@ impl Read for Connection {
 impl Write for Connection {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         match self {
-            #[cfg(unix)]
             Connection::Unix(s) => s.write(buf),
-            Connection::Tcp(s) => s.write(buf),
         }
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
         match self {
-            #[cfg(unix)]
             Connection::Unix(s) => s.flush(),
-            Connection::Tcp(s) => s.flush(),
         }
     }
 }
@@ -73,17 +59,13 @@ impl Write for Connection {
 impl Connection {
     pub fn set_read_timeout(&self, dur: Option<Duration>) -> std::io::Result<()> {
         match self {
-            #[cfg(unix)]
             Connection::Unix(s) => s.set_read_timeout(dur),
-            Connection::Tcp(s) => s.set_read_timeout(dur),
         }
     }
 
     pub fn set_write_timeout(&self, dur: Option<Duration>) -> std::io::Result<()> {
         match self {
-            #[cfg(unix)]
             Connection::Unix(s) => s.set_write_timeout(dur),
-            Connection::Tcp(s) => s.set_write_timeout(dur),
         }
     }
 }
@@ -141,12 +123,6 @@ pub fn cleanup_stale_files(session: &str) {
         let socket_path = get_socket_path(session);
         let _ = fs::remove_file(&socket_path);
     }
-
-    #[cfg(windows)]
-    {
-        let port_path = get_port_path(session);
-        let _ = fs::remove_file(&port_path);
-    }
 }
 
 /// Returns whether a process with the given PID is currently alive.
@@ -161,16 +137,6 @@ pub fn is_pid_alive(pid: u32) -> bool {
             return true;
         }
         std::io::Error::last_os_error().raw_os_error() != Some(libc::ESRCH)
-    }
-    #[cfg(windows)]
-    unsafe {
-        let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
-        if handle != 0 {
-            CloseHandle(handle);
-            true
-        } else {
-            false
-        }
     }
 }
 
@@ -329,48 +295,11 @@ pub fn walk_daemons() -> DaemonInventory {
     inventory
 }
 
-#[cfg(windows)]
-fn get_port_path(session: &str) -> PathBuf {
-    get_socket_dir().join(format!("{}.port", session))
-}
-
-#[cfg(windows)]
-pub fn get_port_for_session(session: &str) -> u16 {
-    let mut hash: i32 = 0;
-    for c in session.chars() {
-        hash = ((hash << 5).wrapping_sub(hash)).wrapping_add(c as i32);
-    }
-    // Correct logic: first take absolute modulo, then cast to u16
-    // Using unsigned_abs() to safely handle i32::MIN
-    49152 + ((hash.unsigned_abs() as u32 % 16383) as u16)
-}
-
-/// Read the actual daemon port from the `.port` file written by the daemon.
-/// Falls back to the hash-derived port if the file does not exist or is
-/// unreadable (e.g. daemon has not started yet).
-#[cfg(windows)]
-pub fn resolve_port(session: &str) -> u16 {
-    let port_path = get_port_path(session);
-    fs::read_to_string(&port_path)
-        .ok()
-        .and_then(|s| s.trim().parse::<u16>().ok())
-        .unwrap_or_else(|| get_port_for_session(session))
-}
-
 pub fn daemon_ready(session: &str) -> bool {
     #[cfg(unix)]
     {
         let socket_path = get_socket_path(session);
         UnixStream::connect(&socket_path).is_ok()
-    }
-    #[cfg(windows)]
-    {
-        let port = resolve_port(session);
-        TcpStream::connect_timeout(
-            &format!("127.0.0.1:{}", port).parse().unwrap(),
-            Duration::from_millis(50),
-        )
-        .is_ok()
     }
 }
 
@@ -564,15 +493,6 @@ fn kill_stale_daemon(session: &str) {
                     thread::sleep(Duration::from_millis(100));
                 }
             }
-            #[cfg(windows)]
-            {
-                let _ = Command::new("taskkill")
-                    .args(["/PID", &pid.to_string(), "/F"])
-                    .stdout(Stdio::null())
-                    .stderr(Stdio::null())
-                    .status();
-                thread::sleep(Duration::from_millis(500));
-            }
         }
     }
 
@@ -651,53 +571,25 @@ pub fn ensure_daemon(session: &str, opts: &DaemonOptions) -> Result<DaemonResult
     let exe_path = env::current_exe().map_err(|e| e.to_string())?;
     let exe_path = exe_path.canonicalize().unwrap_or(exe_path);
 
-    #[allow(unused_assignments)]
-    let mut daemon_child: Option<std::process::Child> = None;
+    let mut cmd = Command::new(&exe_path);
+    cmd.env("AGENT_BROWSER_DAEMON", "1");
+    apply_daemon_env(&mut cmd, session, opts);
 
-    #[cfg(unix)]
-    {
-        use std::os::unix::process::CommandExt;
-
-        let mut cmd = Command::new(&exe_path);
-        cmd.env("AGENT_BROWSER_DAEMON", "1");
-        apply_daemon_env(&mut cmd, session, opts);
-
-        unsafe {
-            cmd.pre_exec(|| {
-                libc::setsid();
-                Ok(())
-            });
-        }
-
-        daemon_child = Some(
-            cmd.stdin(Stdio::null())
-                .stdout(Stdio::null())
-                .stderr(Stdio::piped())
-                .spawn()
-                .map_err(|e| format!("Failed to start daemon: {}", e))?,
-        );
+    use std::os::unix::process::CommandExt;
+    unsafe {
+        cmd.pre_exec(|| {
+            libc::setsid();
+            Ok(())
+        });
     }
 
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-
-        let mut cmd = Command::new(&exe_path);
-        cmd.env("AGENT_BROWSER_DAEMON", "1");
-        apply_daemon_env(&mut cmd, session, opts);
-
-        const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
-        const DETACHED_PROCESS: u32 = 0x00000008;
-
-        daemon_child = Some(
-            cmd.creation_flags(CREATE_NEW_PROCESS_GROUP | DETACHED_PROCESS)
-                .stdin(Stdio::null())
-                .stdout(Stdio::null())
-                .stderr(Stdio::piped())
-                .spawn()
-                .map_err(|e| format!("Failed to start daemon: {}", e))?,
-        );
-    }
+    let mut daemon_child: Option<std::process::Child> = Some(
+        cmd.stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|e| format!("Failed to start daemon: {}", e))?,
+    );
 
     for _ in 0..50 {
         if daemon_ready(session) {
@@ -757,27 +649,14 @@ pub fn ensure_daemon(session: &str, opts: &DaemonOptions) -> Result<DaemonResult
         "socket: {}",
         get_socket_dir().join(format!("{}.sock", session)).display()
     );
-    #[cfg(windows)]
-    let endpoint_info = format!("port: 127.0.0.1:{}", resolve_port(session));
-
     Err(format!("Daemon failed to start ({})", endpoint_info))
 }
 
 fn connect(session: &str) -> Result<Connection, String> {
-    #[cfg(unix)]
-    {
-        let socket_path = get_socket_path(session);
-        UnixStream::connect(&socket_path)
-            .map(Connection::Unix)
-            .map_err(|e| format!("Failed to connect: {}", e))
-    }
-    #[cfg(windows)]
-    {
-        let port = resolve_port(session);
-        TcpStream::connect(format!("127.0.0.1:{}", port))
-            .map(Connection::Tcp)
-            .map_err(|e| format!("Failed to connect: {}", e))
-    }
+    let socket_path = get_socket_path(session);
+    UnixStream::connect(&socket_path)
+        .map(Connection::Unix)
+        .map_err(|e| format!("Failed to connect: {}", e))
 }
 
 pub fn send_command(cmd: Value, session: &str) -> Result<Response, String> {
@@ -1047,35 +926,12 @@ mod tests {
     }
 
     #[test]
-    fn test_connection_refused_windows_is_unreachable_not_transient() {
-        let error = "Failed to connect: No connection could be made because the target machine actively refused it. (os error 10061)";
-        assert!(!is_transient_error(error));
-        assert!(daemon_unreachable(error));
-    }
-
-    #[test]
-    fn test_is_transient_error_connection_reset_windows() {
-        assert!(is_transient_error(
-            "Failed to send: An existing connection was forcibly closed by the remote host. (os error 10054)"
-        ));
-    }
-
-    #[test]
     fn test_is_transient_error_non_transient() {
         // These should NOT be considered transient
         assert!(!is_transient_error("Unknown command: foo"));
         assert!(!is_transient_error("Invalid JSON syntax"));
         assert!(!is_transient_error("Permission denied"));
         assert!(!is_transient_error("Daemon not found"));
-    }
-
-    #[test]
-    #[cfg(windows)]
-    fn test_get_port_for_session() {
-        assert_eq!(get_port_for_session("default"), 50838);
-        assert_eq!(get_port_for_session("my-session"), 63105);
-        assert_eq!(get_port_for_session("work"), 51184);
-        assert_eq!(get_port_for_session(""), 49152);
     }
 
     // === Daemon Version Mismatch Detection Tests ===

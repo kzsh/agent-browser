@@ -51,12 +51,7 @@ pub(super) fn disk_free_bytes(path: &Path) -> Option<u64> {
     Some(stat.f_bavail as u64 * stat.f_frsize)
 }
 
-#[cfg(windows)]
-pub(super) fn disk_free_bytes(_path: &Path) -> Option<u64> {
-    None
-}
-
-#[cfg(not(any(unix, windows)))]
+#[cfg(not(unix))]
 pub(super) fn disk_free_bytes(_path: &Path) -> Option<u64> {
     None
 }

@@ -21,11 +21,6 @@ use std::env;
 use std::fs;
 use std::process::exit;
 
-#[cfg(windows)]
-use windows_sys::Win32::Foundation::CloseHandle;
-#[cfg(windows)]
-use windows_sys::Win32::System::Threading::OpenProcess;
-
 use commands::{gen_id, parse_command, ParseError};
 use connection::{
     cleanup_stale_files, daemon_unreachable, ensure_daemon, get_socket_dir, is_pid_alive,
@@ -416,14 +411,6 @@ fn run_dashboard_start(port: u16, json_mode: bool) {
         }
     }
 
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
-        const DETACHED_PROCESS: u32 = 0x00000008;
-        cmd.creation_flags(CREATE_NEW_PROCESS_GROUP | DETACHED_PROCESS);
-    }
-
     match cmd
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
@@ -496,17 +483,6 @@ fn run_dashboard_stop(json_mode: bool) {
             libc::kill(pid as i32, libc::SIGTERM);
         }
     }
-    #[cfg(windows)]
-    {
-        unsafe {
-            let handle = OpenProcess(1, 0, pid); // PROCESS_TERMINATE = 1
-            if handle != 0 {
-                windows_sys::Win32::System::Threading::TerminateProcess(handle, 0);
-                CloseHandle(handle);
-            }
-        }
-    }
-
     let _ = fs::remove_file(&pid_path);
 
     if json_mode {
@@ -558,14 +534,6 @@ fn run_close_all(flags: &Flags) {
                 unsafe {
                     libc::kill(*pid as i32, libc::SIGKILL);
                 }
-                #[cfg(windows)]
-                unsafe {
-                    let handle = OpenProcess(1, 0, *pid); // PROCESS_TERMINATE = 1
-                    if handle != 0 {
-                        windows_sys::Win32::System::Threading::TerminateProcess(handle, 1);
-                        CloseHandle(handle);
-                    }
-                }
                 cleanup_stale_files(session);
                 closed.push(session.clone());
             }
@@ -604,13 +572,6 @@ fn main() {
     #[cfg(unix)]
     unsafe {
         libc::signal(libc::SIGPIPE, libc::SIG_DFL);
-    }
-
-    // Prevent MSYS/Git Bash path translation from mangling arguments
-    #[cfg(windows)]
-    {
-        env::set_var("MSYS_NO_PATHCONV", "1");
-        env::set_var("MSYS2_ARG_CONV_EXCL", "*");
     }
 
     // Native daemon mode: when AGENT_BROWSER_DAEMON is set, run as the daemon process
