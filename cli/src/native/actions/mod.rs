@@ -7216,18 +7216,18 @@ printf '%s' '{"protocol":"agent-browser.plugin.v1","success":true,"data":{}}'
 
     #[test]
     fn test_default_timeout_ms_from_env() {
-        // When AGENT_BROWSER_DEFAULT_TIMEOUT is set, DaemonState should use it
-        env::set_var("AGENT_BROWSER_DEFAULT_TIMEOUT", "3000");
+        let guard = crate::test_utils::EnvGuard::new(&["AGENT_BROWSER_DEFAULT_TIMEOUT"]);
+        guard.set("AGENT_BROWSER_DEFAULT_TIMEOUT", "3000");
         let state = DaemonState::new();
         assert_eq!(state.default_timeout_ms, 3000);
-        env::remove_var("AGENT_BROWSER_DEFAULT_TIMEOUT");
     }
 
     #[test]
     fn test_default_timeout_ms_fallback() {
         // When AGENT_BROWSER_DEFAULT_TIMEOUT is unset, DaemonState uses the
         // documented 25s default (below the CLI's 30s IPC read timeout).
-        env::remove_var("AGENT_BROWSER_DEFAULT_TIMEOUT");
+        let guard = crate::test_utils::EnvGuard::new(&["AGENT_BROWSER_DEFAULT_TIMEOUT"]);
+        guard.remove("AGENT_BROWSER_DEFAULT_TIMEOUT");
         let state = DaemonState::new();
         assert_eq!(state.default_timeout_ms, 25_000);
     }

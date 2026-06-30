@@ -62,8 +62,8 @@ jobs:
         with:
           workspaces: cli
 
-      - name: Run Rust tests
-        run: cargo test --profile ci --manifest-path cli/Cargo.toml --target ${{ matrix.target }}
+      - name: Check cross-compilation
+        run: cargo test --profile ci --manifest-path cli/Cargo.toml --target ${{ matrix.target }} --no-run
 
   native-e2e:
     name: Native E2E Tests
