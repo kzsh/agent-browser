@@ -103,7 +103,7 @@ The output is a JSON file in Chrome Trace Event format:
 }
 ```
 
-The `metadata.clock-domain` field is set based on the host platform (Linux or macOS). On Windows it is omitted.
+The `metadata.clock-domain` field is set based on the host platform (`LINUX_CLOCK_MONOTONIC` on Linux, `MAC_MACH_ABSOLUTE_TIME` on macOS).
 
 ## Viewing Profiles
 

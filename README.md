@@ -2,29 +2,15 @@
 
 Browser automation CLI for AI agents. Fast native Rust CLI.
 
-[![skills.sh](https://skills.sh/b/vercel-labs/agent-browser)](https://skills.sh/vercel-labs/agent-browser)
-
 ## Installation
 
-### Global Installation (recommended)
+### GitHub Releases
 
-Installs the native Rust binary:
+Download a pre-built binary for your platform from the [GitHub releases page](https://github.com/kzsh/agent-browser/releases/latest) and place it somewhere on your `PATH`, then run:
 
 ```bash
-npm install -g agent-browser
 agent-browser install  # Download Chrome from Chrome for Testing (first time only)
 ```
-
-### Project Installation (local dependency)
-
-For projects that want to pin the version in `package.json`:
-
-```bash
-npm install agent-browser
-agent-browser install
-```
-
-Then use via `package.json` scripts or by invoking `agent-browser` directly.
 
 ### Homebrew (macOS)
 
@@ -42,15 +28,13 @@ agent-browser install  # Download Chrome from Chrome for Testing (first time onl
 
 ### From Source
 
-Requires Node.js 24+, pnpm 11+, and Rust.
+Requires Rust.
 
 ```bash
-git clone https://github.com/vercel-labs/agent-browser
+git clone https://github.com/kzsh/agent-browser
 cd agent-browser
-pnpm install
-pnpm build
-pnpm build:native   # Requires Rust (https://rustup.rs)
-pnpm link --global  # Makes agent-browser available globally
+cargo build --release
+# Copy cli/target/release/agent-browser somewhere on your PATH
 agent-browser install
 ```
 
@@ -72,12 +56,11 @@ Upgrade to the latest version:
 agent-browser upgrade
 ```
 
-Detects your installation method (npm, Homebrew, or Cargo) and runs the appropriate update command automatically.
+Detects your installation method (Homebrew or Cargo) and runs the appropriate update command automatically. For binary downloads from GitHub releases, download and replace the binary manually.
 
 ### Requirements
 
 - **Chrome** - Run `agent-browser install` to download Chrome from [Chrome for Testing](https://developer.chrome.com/blog/chrome-for-testing/) (Google's official automation channel). Existing Chrome, Brave, Playwright, and Puppeteer installations are detected automatically. No Playwright or Node.js required for the daemon.
-- **Node.js 24+ and pnpm 11+** - Only needed when building from source.
 - **Rust** - Only needed when building from source (see From Source above).
 
 ## Quick Start
@@ -639,8 +622,6 @@ AGENT_BROWSER_PROFILE=Default agent-browser open https://gmail.com
 
 This copies your Chrome profile to a temp directory (read-only snapshot, no changes to your original profile), so the browser launches with your existing cookies and sessions.
 
-> **Note:** On Windows, close Chrome before using `--profile <name>` if Chrome is running, as some profile files may be locked.
-
 ## Persistent Profiles
 
 For a persistent custom profile directory that stores state across browser restarts, pass a path to `--profile`:
@@ -902,34 +883,9 @@ This is useful for multimodal AI models that can reason about visual layout, unl
 | `--config <path>` | Use a custom config file (or `AGENT_BROWSER_CONFIG` env) |
 | `--debug` | Debug output |
 
-## Observability Dashboard
+## AI Chat
 
-Monitor agent-browser sessions in real time with a local web dashboard showing a live viewport and command activity feed.
-
-```bash
-# Start the dashboard server (runs in background on port 4848)
-agent-browser dashboard start
-agent-browser dashboard start --port 8080   # Custom port
-
-# All sessions are automatically visible in the dashboard
-agent-browser open example.com
-
-# Stop the dashboard
-agent-browser dashboard stop
-```
-
-The dashboard runs as a standalone background process on port 4848, independent of browser sessions. It stays available even when no sessions are running, and it works from `http://localhost:4848` or a proxied/forwarded URL that reaches the dashboard server, such as `https://dashboard.agent-browser.localhost` or a Coder workspace URL. The browser stays on the dashboard origin; session-specific tabs, status, and stream traffic are proxied internally, so session ports do not need to be exposed.
-
-The dashboard displays:
-- **Live viewport**: real-time JPEG frames from the browser
-- **Activity feed**: chronological command/result stream with timing and expandable details
-- **Console output**: browser console messages (log, warn, error)
-- **Session creation**: create new sessions from the UI with local engines (Chrome, Lightpanda) or cloud providers (AgentCore, Browserbase, Browserless, Browser Use, Kernel)
-- **AI Chat**: chat with an AI assistant directly in the dashboard (requires Vercel AI Gateway configuration)
-
-### AI Chat
-
-The dashboard includes an optional AI chat panel powered by the Vercel AI Gateway. The same functionality is available directly from the CLI via the `chat` command. Set these environment variables to enable AI chat:
+The `chat` command provides natural language browser control powered by the Vercel AI Gateway. Set these environment variables to enable it:
 
 ```bash
 export AI_GATEWAY_API_KEY=gw_your_key_here
@@ -948,10 +904,6 @@ agent-browser --model openai/gpt-4o chat "take a screenshot" # Override model
 ```
 
 The `chat` command translates natural language instructions into agent-browser commands, executes them, and streams the AI response. In interactive mode, type `quit` to exit. Use `--json` for structured output suitable for agent consumption.
-
-**Dashboard usage:**
-
-The Chat tab is always visible in the dashboard. When `AI_GATEWAY_API_KEY` is set, the Rust server proxies requests to the gateway and streams responses back using the Vercel AI SDK's UI Message Stream protocol. Without the key, sending a message shows an error inline.
 
 ## Configuration
 
@@ -1188,23 +1140,6 @@ agent-browser --executable-path /path/to/chromium open example.com
 AGENT_BROWSER_EXECUTABLE_PATH=/path/to/chromium agent-browser open example.com
 ```
 
-### Serverless (Vercel)
-
-Run agent-browser + Chrome in an ephemeral Vercel Sandbox microVM. No external server needed:
-
-```typescript
-import { runAgentBrowserCommand, withAgentBrowserSandbox } from "@agent-browser/sandbox/vercel";
-
-const result = await withAgentBrowserSandbox(async (sandbox) => {
-  await runAgentBrowserCommand(sandbox, ["open", "https://example.com"]);
-  return runAgentBrowserCommand(sandbox, ["screenshot"]);
-});
-```
-
-Install `@agent-browser/sandbox` and `@vercel/sandbox` in the consuming app. See the [sandbox helper example](examples/sandbox/) for minimal Eve and Vercel Sandbox usage, or the [environments example](examples/environments/) for a full UI demo with a deploy-to-Vercel button.
-
-Fresh Vercel and Eve sandboxes install Chromium system dependencies by default. Pass `installSystemDependencies: false` only when your sandbox image already includes those libraries.
-
 ### Serverless (AWS Lambda)
 
 ```typescript
@@ -1395,13 +1330,14 @@ The daemon starts automatically on first command and persists between commands f
 
 ## Platforms
 
-| Platform    | Binary      |
-| ----------- | ----------- |
-| macOS ARM64 | Native Rust |
-| macOS x64   | Native Rust |
-| Linux ARM64 | Native Rust |
-| Linux x64   | Native Rust |
-| Windows x64 | Native Rust |
+| Platform         | Binary      |
+| ---------------- | ----------- |
+| macOS ARM64      | Native Rust |
+| macOS x64        | Native Rust |
+| Linux ARM64      | Native Rust |
+| Linux x64        | Native Rust |
+| Linux musl ARM64 | Native Rust |
+| Linux musl x64   | Native Rust |
 
 ## Usage with AI Agents
 
@@ -1415,25 +1351,15 @@ Use agent-browser to test the login flow. Run agent-browser --help to see availa
 
 The `--help` output is comprehensive and most agents can figure it out from there.
 
-### AI Coding Assistants (recommended)
+### AI Coding Assistants
 
-Add the skill to your AI coding assistant for richer context:
-
-```bash
-npx skills add vercel-labs/agent-browser
-```
-
-This works with Claude Code, Codex, Cursor, Gemini CLI, GitHub Copilot, Goose, OpenCode, and Windsurf. The skill is fetched from the repository, so it stays up to date automatically. Do not copy `SKILL.md` from `node_modules` as it will become stale.
-
-### Claude Code
-
-Install as a Claude Code skill:
+Load the built-in skill to give your AI coding assistant full context:
 
 ```bash
-npx skills add vercel-labs/agent-browser
+agent-browser skills get core
 ```
 
-This adds a thin discovery stub at `.claude/skills/agent-browser/SKILL.md`. The stub is intentionally minimal — it points Claude Code at `agent-browser skills get core` to load the actual workflow content at runtime. This way the instructions always match the installed CLI version instead of going stale between releases.
+The skill content always matches the installed CLI version.
 
 ### AGENTS.md / CLAUDE.md
 
