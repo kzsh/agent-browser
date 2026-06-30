@@ -1,5 +1,5 @@
 {
-  "name": "agent-browser",
+  "name": "pi-agent-browser",
   "version": "0.1.0",
   "description": "pi extension that wraps the agent-browser CLI as browser tools",
   "private": true
