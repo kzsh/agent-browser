@@ -182,15 +182,9 @@ jobs:
         run: |
           VERSION="${{ needs.check-release.outputs.version }}"
           TAG="v$VERSION"
-          if gh release view "$TAG" &>/dev/null; then
-            echo "Release $TAG already exists, uploading assets..."
-            gh release upload "$TAG" bin/agent-browser-* --clobber
-          else
-            echo "Creating release $TAG..."
-            gh release create "$TAG" \
-              --title "$TAG" \
-              --notes-file /tmp/release-notes.md \
-              bin/agent-browser-*
-          fi
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --notes-file /tmp/release-notes.md \
+            bin/agent-browser-*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
