@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Resolve project root from the script's own location, regardless of cwd.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Read extension name from package.json.
+NAME="$(jq -r '.name' "$PROJECT_ROOT/package.json")"
+if [[ -z "$NAME" || "$NAME" == "null" ]]; then
+  echo "error: could not read .name from $PROJECT_ROOT/package.json" >&2
+  exit 1
+fi
+
+# Strip npm scope prefix (@foo/) so the destination is a single directory name.
+BARE_NAME="${NAME#*/}"
+DEST="$HOME/.pi/agent/extensions/$BARE_NAME"
+
+echo "deploying $BARE_NAME"
+echo "  from: $PROJECT_ROOT"
+echo "    to: $DEST"
+
+# Remove existing install.
+rm -rf "$DEST"
+mkdir -p "$DEST"
+
+# Build the list of files to copy: everything except .git and anything
+# matched by .gitignore (if one exists).
+cd "$PROJECT_ROOT"
+
+if [[ -f .gitignore ]] && git -C "$PROJECT_ROOT" rev-parse --git-dir &>/dev/null; then
+  # Inside a git repo: let git tell us which files are not ignored.
+  mapfile -t files < <(git ls-files --cached --others --exclude-standard)
+else
+  # No git or no .gitignore: copy everything except .git.
+  mapfile -t files < <(find . -not -path './.git/*' -not -name '.git' -type f | sed 's|^\./||')
+fi
+
+for f in "${files[@]}"; do
+  dest_file="$DEST/$f"
+  mkdir -p "$(dirname "$dest_file")"
+  cp "$f" "$dest_file"
+done
+
+echo "done (${#files[@]} files)"
