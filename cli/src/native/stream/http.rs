@@ -277,7 +277,6 @@ pub(super) async fn handle_http_request(
             let _ = stream.write_all(resp_body.as_bytes()).await;
             return;
         }
-
     }
 
     let (status, content_type, body): (&str, &str, Vec<u8>) = if path == "/api/sessions" {
