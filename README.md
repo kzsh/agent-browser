@@ -877,33 +877,8 @@ This is useful for multimodal AI models that can reason about visual layout, unl
 | `--confirm-interactive` | Interactive confirmation prompts; auto-denies if stdin is not a TTY (or `AGENT_BROWSER_CONFIRM_INTERACTIVE` env) |
 | `--engine <name>` | Browser engine: `chrome` (default), `lightpanda` (or `AGENT_BROWSER_ENGINE` env) |
 | `--no-auto-dialog` | Disable automatic dismissal of `alert`/`beforeunload` dialogs (or `AGENT_BROWSER_NO_AUTO_DIALOG` env) |
-| `--model <name>` | AI model for chat command (or `AI_GATEWAY_MODEL` env) |
-| `-v`, `--verbose` | Show tool commands and their raw output (chat) |
-| `-q`, `--quiet` | Show only AI text responses, hide tool calls (chat) |
 | `--config <path>` | Use a custom config file (or `AGENT_BROWSER_CONFIG` env) |
 | `--debug` | Debug output |
-
-## AI Chat
-
-The `chat` command provides natural language browser control powered by the Vercel AI Gateway. Set these environment variables to enable it:
-
-```bash
-export AI_GATEWAY_API_KEY=gw_your_key_here
-export AI_GATEWAY_MODEL=anthropic/claude-sonnet-4.6           # optional, this is the default
-export AI_GATEWAY_URL=https://ai-gateway.vercel.sh           # optional, this is the default
-```
-
-**CLI usage:**
-
-```bash
-agent-browser chat "open google.com and search for cats"     # Single-shot
-agent-browser chat                                           # Interactive REPL
-agent-browser -q chat "summarize this page"                  # Quiet mode (text only)
-agent-browser -v chat "fill in the login form"               # Verbose (show command output)
-agent-browser --model openai/gpt-4o chat "take a screenshot" # Override model
-```
-
-The `chat` command translates natural language instructions into agent-browser commands, executes them, and streams the AI response. In interactive mode, type `quit` to exit. Use `--json` for structured output suitable for agent consumption.
 
 ## Configuration
 

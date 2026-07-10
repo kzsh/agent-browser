@@ -279,7 +279,7 @@ See messages that have been pinned in a channel.
 In Slack snapshot, message timestamps appear as links. Example:
 ```
 - link "Feb 25th at 10:26:22 AM" [ref=e151]
-  - /url: https://vercel.slack.com/archives/C0A5RTN0856/p1772036782543189
+  - /url: https://example.slack.com/archives/C0A5RTN0811/p1234567892543189
 ```
 
 The URL contains the timestamp in the fragment (`p1772036782543189`). This is a Slack message ID that uniquely identifies the message.
