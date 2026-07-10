@@ -177,8 +177,6 @@ pub(super) async fn handle_http_request(
     let first_line = request.lines().next().unwrap_or("");
     let method = first_line.split_whitespace().next().unwrap_or("GET");
     let path = first_line.split_whitespace().nth(1).unwrap_or("/");
-    let origin = parse_origin(peeked);
-
     if method == "OPTIONS" {
         if path == "/api/command" {
             if !is_same_origin_command_request(&request) {

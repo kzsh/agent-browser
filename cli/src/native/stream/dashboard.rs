@@ -517,8 +517,6 @@ async fn handle_dashboard_connection(mut stream: tokio::net::TcpStream) {
 
     let request = String::from_utf8_lossy(&buf[..n]).to_string();
     let (method, path) = parse_request_method_and_path(&request);
-    let origin = request_header_value(&request, "origin").map(|value| value.to_string());
-
     if method == "OPTIONS" {
         let response = format!(
             "HTTP/1.1 204 No Content\r\n{CORS_HEADERS}Access-Control-Max-Age: 86400\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"

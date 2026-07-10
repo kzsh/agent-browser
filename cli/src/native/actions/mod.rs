@@ -43,9 +43,13 @@ mod launch;
 mod net;
 
 // Re-exports for tests in parity_tests.rs and actions mod tests.
+#[cfg(test)]
 use super::webdriver::backend::WebDriverBackend;
+#[cfg(test)]
 pub(crate) use input::build_mouse_event_params;
+#[cfg(test)]
 pub(crate) use launch::{hide_scrollbars_from_launch_cmd, launch_options_from_env};
+#[cfg(test)]
 pub(crate) use net::{
     browser_metadata_from_version, build_fetch_patterns, get_har_dir, har_compute_timings,
     har_entry_to_json, har_parse_request_cookies, har_wall_time_to_rfc3339, matches_status_filter,
