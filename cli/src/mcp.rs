@@ -163,7 +163,6 @@ const TOOL_DASHBOARD_START: &str = "agent_browser_dashboard_start";
 const TOOL_DASHBOARD_STOP: &str = "agent_browser_dashboard_stop";
 const TOOL_INSTALL: &str = "agent_browser_install";
 const TOOL_UPGRADE: &str = "agent_browser_upgrade";
-const TOOL_CHAT: &str = "agent_browser_chat";
 const TOOL_EVAL: &str = "agent_browser_eval";
 const TOOL_CLOSE: &str = "agent_browser_close";
 const TOOL_TOOLS_PROFILES: &str = "agent_browser_tools_profiles";
@@ -251,7 +250,7 @@ impl ToolProfile {
             Self::Core => "Everyday browser automation with navigation, snapshots, common interaction, waits, screenshots, basic reads, tab basics, JavaScript eval, close, and profile discovery.",
             Self::Network => "Network interception, request inspection, HAR capture, headers, credentials, and offline mode.",
             Self::State => "Cookies, storage, auth profiles, saved browser state, sessions, Chrome profiles, and bundled skills.",
-            Self::Debug => "Console/errors, highlighting, DevTools, tracing, profiling, PDF, downloads/uploads, recording, clipboard, plugin registry and plugin command.run, doctor, dashboard, install, upgrade, and chat.",
+            Self::Debug => "Console/errors, highlighting, DevTools, tracing, profiling, PDF, downloads/uploads, recording, clipboard, plugin registry and plugin command.run, doctor, dashboard, install, and upgrade.",
             Self::Tabs => "Tab, window, frame, and JavaScript dialog management.",
             Self::React => "React tree inspection, render recording, Suspense inspection, Web Vitals, SPA pushstate, and init-script removal.",
             Self::Mobile => "Viewport/device/geolocation/media emulation plus touch, swipe, and lower-level mouse tools.",
@@ -431,7 +430,6 @@ const DEBUG_PROFILE_TOOLS: &[&str] = &[
     TOOL_DASHBOARD_STOP,
     TOOL_INSTALL,
     TOOL_UPGRADE,
-    TOOL_CHAT,
 ];
 
 const TABS_PROFILE_TOOLS: &[&str] = &[
@@ -1729,13 +1727,6 @@ fn parity_tools() -> Vec<Value> {
             json!({}),
             &[],
         ),
-        tool(
-            TOOL_CHAT,
-            "Chat",
-            "Run a single-shot natural-language browser instruction.",
-            json!({ "message": { "type": "string" }, "model": { "type": "string" }, "verbose": { "type": "boolean" }, "quiet": { "type": "boolean" } }),
-            &["message"],
-        ),
     ]
 }
 
@@ -2123,7 +2114,6 @@ fn call_tool(params: Option<&Value>, config: &McpConfig) -> Result<Value, Protoc
         TOOL_DASHBOARD_STOP => call_literal(arguments, &["dashboard", "stop"]),
         TOOL_INSTALL => call_install(arguments),
         TOOL_UPGRADE => call_literal(arguments, &["upgrade"]),
-        TOOL_CHAT => call_chat(arguments),
         TOOL_EVAL => call_eval(arguments),
         TOOL_CLOSE => call_close(arguments),
         _ => unreachable!("known MCP tool missing call handler: {}", name),
@@ -3136,24 +3126,6 @@ fn call_install(arguments: &Value) -> Result<Value, ProtocolError> {
     if optional_bool(arguments, "withDeps")?.unwrap_or(false) {
         args.push("--with-deps".to_string());
     }
-    call_cli_tool(arguments, args, None)
-}
-
-fn call_chat(arguments: &Value) -> Result<Value, ProtocolError> {
-    let message = required_string(arguments, "message")?;
-    let mut args = Vec::new();
-    if let Some(model) = optional_string(arguments, "model")? {
-        args.push("--model".to_string());
-        args.push(model);
-    }
-    if optional_bool(arguments, "verbose")?.unwrap_or(false) {
-        args.push("--verbose".to_string());
-    }
-    if optional_bool(arguments, "quiet")?.unwrap_or(false) {
-        args.push("--quiet".to_string());
-    }
-    args.push("chat".to_string());
-    args.push(message);
     call_cli_tool(arguments, args, None)
 }
 

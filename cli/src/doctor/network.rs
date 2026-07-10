@@ -56,20 +56,6 @@ pub(super) fn check(checks: &mut Vec<Check>) {
         "Chrome for Testing CDN",
     );
 
-    if env::var("AI_GATEWAY_API_KEY").is_ok() {
-        let url = env::var("AI_GATEWAY_URL")
-            .unwrap_or_else(|_| "https://ai-gateway.vercel.sh".to_string());
-        probe_url(
-            &rt,
-            &client,
-            checks,
-            category,
-            "net.ai_gateway",
-            &url,
-            "AI Gateway",
-        );
-    }
-
     if let Ok(provider) = env::var("AGENT_BROWSER_PROVIDER") {
         let url: Option<String> = match provider.to_lowercase().as_str() {
             "browserbase" => Some("https://api.browserbase.com".to_string()),

@@ -6,7 +6,6 @@ use tokio::sync::RwLock;
 
 use crate::connection::get_socket_dir;
 
-use super::chat::{chat_status_json, handle_chat_request, handle_models_request};
 use super::dashboard::spawn_session;
 use super::discovery::discover_sessions;
 
@@ -219,9 +218,7 @@ pub(super) async fn handle_http_request(
         }
 
         let full_body = read_full_body(&mut stream, peeked).await;
-        if full_body.is_none()
-            && (path == "/api/chat" || path == "/api/sessions" || path == "/api/command")
-        {
+        if full_body.is_none() && (path == "/api/sessions" || path == "/api/command") {
             let body = r#"{"error":"Request body too large"}"#;
             let cors_headers = if path == "/api/command" {
                 command_cors_headers(&request)
@@ -281,15 +278,6 @@ pub(super) async fn handle_http_request(
             return;
         }
 
-        if path == "/api/chat" {
-            handle_chat_request(&mut stream, body_str, origin.as_deref()).await;
-            return;
-        }
-    }
-
-    if method == "GET" && path == "/api/models" {
-        handle_models_request(&mut stream, origin.as_deref()).await;
-        return;
     }
 
     let (status, content_type, body): (&str, &str, Vec<u8>) = if path == "/api/sessions" {
@@ -313,12 +301,6 @@ pub(super) async fn handle_http_request(
             "200 OK",
             "application/json; charset=utf-8",
             format!(r#"{{"engine":"{}"}}"#, *engine).into_bytes(),
-        )
-    } else if path == "/api/chat/status" {
-        (
-            "200 OK",
-            "application/json; charset=utf-8",
-            chat_status_json().into_bytes(),
         )
     } else {
         serve_embedded_file(path)

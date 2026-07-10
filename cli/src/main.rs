@@ -1,4 +1,3 @@
-mod chat;
 mod color;
 mod commands;
 mod connection;
@@ -723,17 +722,6 @@ fn main() {
     ) && clean.iter().any(|a| a == "--all")
     {
         run_close_all(&flags);
-        return;
-    }
-
-    // Handle chat command
-    if clean.first().map(|s| s.as_str()) == Some("chat") {
-        let message = if clean.len() > 1 {
-            Some(clean[1..].join(" "))
-        } else {
-            None
-        };
-        chat::run_chat(&flags, message);
         return;
     }
 

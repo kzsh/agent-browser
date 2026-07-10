@@ -6,7 +6,6 @@ use tokio_tungstenite::tungstenite::Message;
 
 use crate::connection::get_socket_dir;
 
-use super::chat::{chat_status_json, handle_chat_request, handle_models_request};
 use super::discovery::discover_sessions;
 use super::http::{serve_embedded_file, CORS_HEADERS};
 
@@ -528,17 +527,6 @@ async fn handle_dashboard_connection(mut stream: tokio::net::TcpStream) {
         return;
     }
 
-    if method == "POST" && path == "/api/chat" {
-        let body_str = read_post_body(&mut stream, &buf, n).await;
-        handle_chat_request(&mut stream, &body_str, origin.as_deref()).await;
-        return;
-    }
-
-    if method == "GET" && path == "/api/models" {
-        handle_models_request(&mut stream, origin.as_deref()).await;
-        return;
-    }
-
     if method == "POST" && (path == "/api/sessions" || path == "/api/exec" || path == "/api/kill") {
         let body_str = read_post_body(&mut stream, &buf, n).await;
         let result = if path == "/api/exec" {
@@ -616,12 +604,6 @@ async fn handle_dashboard_connection(mut stream: tokio::net::TcpStream) {
             "200 OK",
             "application/json; charset=utf-8",
             discover_sessions().into_bytes(),
-        )
-    } else if path == "/api/chat/status" {
-        (
-            "200 OK",
-            "application/json; charset=utf-8",
-            chat_status_json().into_bytes(),
         )
     } else {
         serve_embedded_file(path)
